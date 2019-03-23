@@ -1,0 +1,28 @@
+{
+  "name": "petshop-api",
+  "version": "1.0.0",
+  "description": "A simple mock api for ci/cd demos",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "mocha --exit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acikogun/node-petshop-api.git"
+  },
+  "author": "Ogun Acik",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/acikogun/node-petshop-api/issues"
+  },
+  "homepage": "https://github.com/acikogun/node-petshop-api#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "chai-http": "^4.3.0",
+    "mocha": "^6.1.3"
+  }
+}
