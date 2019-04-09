@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Code pipeline for automated api functional testing
+
+Parameters:
+  GitHubRepositoryName:
+    Type: String
+    Description: GitHub repository name.
+  GitHubUser:
+    Type: String
+  GitHubBranch:
+    Type: String
+  GitHubToken:
+    Type: String
+    Description: repository token.
+    NoEcho: true
+  ArtifactBucket:
+    Type: String
+  EBProdCNAME:
+    Type: String
+    Description: "CNAME of Production EB environment"
+  EBTestCNAME:
+    Type: String
+    Description: "CNAME of Test EB environment"
+  EBProdAppName:
+    Type: String
+    Description: "EB application name for production"
+  EBProdEnvName:
+    Type: String
+    Description: "EB environment name for production"
+  EBTestAppName:
+    Type: String
+    Description: "EB application name for test"
+  EBTestEnvName:
+    Type: String
+    Description: "EB environment name for test"
+
+Resources:
+  CodePipelineRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName:
+        Fn::Sub: ${AWS::StackName}-CodePipelineRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        -
+          Effect: "Allow"
+          Principal:
+            Service:
+            - "codepipeline.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      Path: /
+      Policies:
+      -
+        PolicyName:
+          Fn::Sub: ${AWS::StackName}-CodePipelineRolePolicy
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          -
+            Effect: "Allow"
+            Action:
+            - "elasticbeanstalk:*"
+            - "ec2:*"
+            - "elasticloadbalancing:*"
+            - "autoscaling:*"
+            - "cloudwatch:*"
+            - "s3:*"
+            - "cloudformation:*"
+            - "iam:PassRole"
+            Resource: '*'
+
+  CDPipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: node-petshop-api-pipeline
+      RoleArn:
+        Fn::GetAtt: [ CodePipelineRole, Arn ]
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+      - Name: Source
+        Actions:
+        - Name: CheckoutSource
+          ActionTypeId:
+            Owner: ThirdParty
+            Category: Source
+            Version: 1
+            Provider: GitHub
+          Configuration:
+            Owner: !Ref GitHubUser
+            PollForSourceChanges: false
+            Repo: !Ref GitHubRepositoryName
+            Branch: !Ref GitHubBranch
+            OAuthToken: !Ref GitHubToken
+          InputArtifacts: []
+          OutputArtifacts:
+          - Name: SourceArtifact
+          RunOrder: 1
+
+      - Name: DeploytoTest
+        Actions:
+        - Name: DeploytoEBTestEnv
+          ActionTypeId:
+            Owner: AWS
+            Category: Deploy
+            Version: 1
+            Provider: ElasticBeanstalk
+          Configuration:
+            ApplicationName: !Ref EBTestAppName
+            EnvironmentName: !Ref EBTestEnvName
+          InputArtifacts:
+          - Name: SourceArtifact
+          OutputArtifacts: []
+          RunOrder: 1
+
+      - Name: Approve
+        Actions:
+        - Name: Approval
+          ActionTypeId:
+            Owner: AWS
+            Category: Approval
+            Version: 1
+            Provider: Manual
+          Configuration:
+            ExternalEntityLink: !Sub
+              - 'http://${test_cname}.${AWS::Region}.elasticbeanstalk.com'
+              - { test_cname: !Ref EBTestCNAME }
+          InputArtifacts: []
+          OutputArtifacts: []
+          RunOrder: 1
+
+      - Name: DeploytoProduction
+        Actions:
+        - Name: DeploytoEBProdEnv
+          ActionTypeId:
+            Owner: AWS
+            Category: Deploy
+            Version: 1
+            Provider: ElasticBeanstalk
+          Configuration:
+            ApplicationName: !Ref EBProdAppName
+            EnvironmentName: !Ref EBProdEnvName
+          InputArtifacts:
+          - Name: SourceArtifact
+          OutputArtifacts: []
+          RunOrder: 1
+
+  CDPipelineWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubToken
+      Filters:
+        -
+          JsonPath: "$.ref"
+          MatchEquals: refs/heads/{Branch}
+      TargetPipeline: !Ref CDPipeline
+      TargetAction: CheckoutSource
+      Name: CDPipelineWebhook
+      TargetPipelineVersion: !GetAtt CDPipeline.Version
+      RegisterWithThirdParty: true
