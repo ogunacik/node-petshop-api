@@ -15,7 +15,7 @@ export S3_BUCKET_NAME="node-petshop-api-$(aws sts get-caller-identity | jq -r .A
 export APP_FILE=node-petshop-api.zip
 export INSTANCE_TYPE=t2.micro
 
-export EBS_PLATFORM="64bit Amazon Linux 2 v3.1.0 running Docker"
+export EBS_PLATFORM="64bit Amazon Linux 2 v3.1.1 running Docker"
 export PROD_APP_NAME=ProdApp
 export PROD_ENV_NAME=ProdEnv
 export TEST_APP_NAME=TestApp
