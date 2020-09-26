@@ -42,7 +42,7 @@ app.get("/pets/1", (req, res, next) => {
         {
           "id": 1,
           "type": "dog",
-          "price": 249.99
+          "price": 250.99
         }
     );
 });
